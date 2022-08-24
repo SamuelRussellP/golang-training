@@ -6,15 +6,15 @@ import (
 )
 
 type transaction struct {
-	transactionId     string  `json:"transaction_id"`
-	loginStatus       bool    `json:"login_status"`
-	transactionStatus bool    `json:"transaction_status"`
-	transactionAmount float32 `json:"transaction_amount"`
-	balance           float32 `json:"balance"`
+	TransactionId     string  `json:"transaction_id"`
+	LoginStatus       bool    `json:"login_status"`
+	TransactionStatus bool    `json:"transaction_status"`
+	TransactionAmount float32 `json:"transaction_amount"`
+	Balance           float32 `json:"balance"`
 }
 
 var transactions = []transaction{
-	{"1", true, true, 50.0, 100.0}}
+	{TransactionId: "1", LoginStatus: true, TransactionStatus: true, TransactionAmount: 50.0, Balance: 100.0}}
 
 func main() {
 	router := gin.Default()
