@@ -5,6 +5,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"net/http"
+	"strconv"
 	"time"
 )
 
@@ -23,6 +24,11 @@ type bank struct {
 	BankPercentage float32 `json:"bank_percentage"`
 }
 
+type account struct {
+	AccountId   string `json:"account_id"`
+	AccountName string `json:"account_name"`
+}
+
 var transactions []transaction
 
 var banks = []bank{
@@ -30,14 +36,45 @@ var banks = []bank{
 	{BankId: "BRI", BankPercentage: 0.1},
 }
 
+var AccountSession account
+
 func main() {
 	router := gin.Default()
 	router.GET("/transactions/:id", getTransaction)
 	router.GET("/transactions", getTransactions)
+	router.GET("/banks/", getBanks)
 	router.GET("/banks/:bank_id", getBankPercentage)
+	router.GET("/banks/fee/:bank_id/:transactionAmount", getTransactionFeeByBank)
+	router.GET("/account", getAccount)
 	router.POST("/transactions", addTransactions)
 	router.POST("/banks", addBanks)
+	router.POST("/account", addAccount)
 	router.Run("localhost:9090")
+}
+
+func isLoggedIn(context *gin.Context) bool {
+	return len(AccountSession.AccountId) > 0
+}
+
+func addAccount(context *gin.Context) {
+	var newAccount account
+	//newAccount.AccountId = "1"
+	//newAccount.AccountName = "Samuel"
+
+	err := context.BindJSON(&newAccount)
+	if err != nil {
+		return
+	}
+	AccountSession = newAccount
+	context.IndentedJSON(http.StatusOK, AccountSession)
+}
+
+func getAccount(context *gin.Context) {
+	if isLoggedIn(context) {
+		context.IndentedJSON(http.StatusOK, AccountSession)
+	} else {
+		context.IndentedJSON(http.StatusOK, "Login Required")
+	}
 }
 
 func getTransactions(context *gin.Context) {
@@ -90,6 +127,10 @@ func getBankPercentageByBankId(bankId string) (*bank, error) {
 }
 
 func addTransactions(context *gin.Context) {
+	if !isLoggedIn(context) {
+		context.IndentedJSON(http.StatusOK, "Login Required")
+		return
+	}
 	var newTransaction transaction
 	newTransaction.TransactionId = uuid.New()
 	newTransaction.TransactionTime = time.Now()
@@ -98,6 +139,14 @@ func addTransactions(context *gin.Context) {
 	if err != nil {
 		return
 	}
+
+	newTransactionBankId := newTransaction.BankId
+	newTransactionPercentage, _ := getBankPercentageByBankId(newTransactionBankId)
+	if newTransactionPercentage == nil {
+		context.IndentedJSON(http.StatusOK, "The bank is not available")
+		return
+	}
+	newTransaction.TransactionFee = newTransaction.TransactionAmount * newTransactionPercentage.BankPercentage
 	transactions = append(transactions, newTransaction)
 	context.IndentedJSON(http.StatusOK, newTransaction)
 }
@@ -117,4 +166,28 @@ func addBanks(context *gin.Context) {
 	}
 	banks = append(banks, newBank)
 	context.IndentedJSON(http.StatusOK, newBank)
+}
+
+func getBanks(context *gin.Context) {
+	if len(banks) == 0 {
+		context.IndentedJSON(http.StatusOK, gin.H{"message": "You have not assigned any banks"})
+	} else {
+		context.IndentedJSON(http.StatusOK, banks)
+	}
+}
+
+func getTransactionFeeByBank(context *gin.Context) {
+	bankID := context.Param("bank_id")
+	transactionAmount := context.Param("transactionAmount")
+	value, _ := strconv.ParseFloat(transactionAmount, 32)
+	transactionAmountFloat := float32(value)
+	bank, err := getBankPercentageByBankId(bankID)
+	if err == nil {
+		percentage := bank.BankPercentage
+		temp := percentage * transactionAmountFloat
+		context.IndentedJSON(http.StatusOK, temp)
+		return
+	} else {
+		context.IndentedJSON(http.StatusOK, "bank not found")
+	}
 }

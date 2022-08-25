@@ -2,10 +2,16 @@
 GET http://localhost:9090/transactions
 
 ### GET
-GET http://localhost:9090/transactions
+GET http://localhost:9090/banks
 
 ### GET
-GET http://localhost:9090/transactions/banks/BCA
+GET http://localhost:9090/banks/BRI
+
+### GET
+GET http://localhost:9090/banks/fee/BRI/2000000
+
+### GET
+GET http://localhost:9090/account
 
 ### POST
 POST http://localhost:9090/transactions
@@ -13,9 +19,9 @@ Content-Type: application/json
 
 {
   "login_status": true,
-  "bank_id": "BCA",
+  "bank_id": "BRI",
   "transaction_status": true,
-  "transaction_amount": 80.0,
+  "transaction_amount": 10000.0,
   "balance": 200.0
 }
 
@@ -26,4 +32,13 @@ Content-Type: application/json
 {
   "bank_id": "Mandiri",
   "bank_percentage": 0.3
+}
+
+### POST
+POST http://localhost:9090/account
+Content-Type: application/json
+
+{
+    "account_id": "SWE1809941",
+    "account_name": "SamuelRussell"
 }
