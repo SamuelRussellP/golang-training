@@ -5,7 +5,7 @@ GET http://localhost:9090/transactions
 GET http://localhost:9090/transactions
 
 ### GET
-GET http://localhost:9090/transactions/banks/goBCA
+GET http://localhost:9090/transactions/banks/BCA
 
 ### POST
 POST http://localhost:9090/transactions
@@ -17,4 +17,13 @@ Content-Type: application/json
   "transaction_status": true,
   "transaction_amount": 80.0,
   "balance": 200.0
+}
+
+### POST
+POST http://localhost:9090/banks
+Content-Type: application/json
+
+{
+  "bank_id": "Mandiri",
+  "bank_percentage": 0.3
 }
