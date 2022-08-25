@@ -5,6 +5,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"net/http"
+	"time"
 )
 
 type transaction struct {
@@ -13,7 +14,8 @@ type transaction struct {
 	BankId            string    `json:"bank_id"`
 	TransactionStatus bool      `json:"transaction_status"`
 	TransactionAmount float32   `json:"transaction_amount"`
-	Balance           float32   `json:"balance"`
+	TransactionFee    float32   `json:"transaction_fee"`
+	TransactionTime   time.Time `json:"transaction_time"`
 }
 
 type bank struct {
@@ -90,6 +92,7 @@ func getBankPercentageByBankId(bankId string) (*bank, error) {
 func addTransactions(context *gin.Context) {
 	var newTransaction transaction
 	newTransaction.TransactionId = uuid.New()
+	newTransaction.TransactionTime = time.Now()
 
 	err := context.BindJSON(&newTransaction)
 	if err != nil {
@@ -105,6 +108,12 @@ func addBanks(context *gin.Context) {
 	err := context.BindJSON(&newBank)
 	if err != nil {
 		return
+	}
+	for _, a := range banks {
+		if a.BankId == newBank.BankId {
+			context.IndentedJSON(http.StatusConflict, gin.H{"message": "bank already exists"})
+			return
+		}
 	}
 	banks = append(banks, newBank)
 	context.IndentedJSON(http.StatusOK, newBank)
