@@ -32,6 +32,7 @@ func main() {
 	router := gin.Default()
 	router.GET("/transactions/:id", getTransaction)
 	router.GET("/transactions", getTransactions)
+	router.GET("/transactions/bank-percentage/:bank_id", getBankPercentage)
 	router.POST("/transactions", addTransactions)
 	router.Run("localhost:9090")
 }
@@ -66,7 +67,7 @@ func getTransactionById(trId uuid.UUID) (*transaction, error) {
 }
 
 func getBankPercentage(context *gin.Context) {
-	bankId := context.Param("bank_name")
+	bankId := context.Param("bank_id")
 	bank, err := getBankPercentageByBankId(bankId)
 
 	if err != nil {
