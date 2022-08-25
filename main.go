@@ -32,8 +32,9 @@ func main() {
 	router := gin.Default()
 	router.GET("/transactions/:id", getTransaction)
 	router.GET("/transactions", getTransactions)
-	router.GET("/transactions/bank-percentage/:bank_id", getBankPercentage)
+	router.GET("/banks/:bank_id", getBankPercentage)
 	router.POST("/transactions", addTransactions)
+	router.POST("/banks", addBanks)
 	router.Run("localhost:9090")
 }
 
@@ -96,4 +97,15 @@ func addTransactions(context *gin.Context) {
 	}
 	transactions = append(transactions, newTransaction)
 	context.IndentedJSON(http.StatusOK, newTransaction)
+}
+
+func addBanks(context *gin.Context) {
+	var newBank bank
+
+	err := context.BindJSON(&newBank)
+	if err != nil {
+		return
+	}
+	banks = append(banks, newBank)
+	context.IndentedJSON(http.StatusOK, newBank)
 }
