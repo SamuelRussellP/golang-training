@@ -13,11 +13,16 @@ type transaction struct {
 	Balance           float32 `json:"balance"`
 }
 
-var transactions = []transaction{
-	{TransactionId: "1", LoginStatus: true, TransactionStatus: true, TransactionAmount: 50.0, Balance: 100.0}}
+type bank struct {
+	BankName       string  `json:"bank_name"`
+	BankPercentage float32 `json:"bank_percentage"`
+}
+
+var transactions []transaction
 
 func main() {
 	router := gin.Default()
+	router.GET("/transactions/:id", getTransactionById)
 	router.GET("/transactions", getTransactions)
 	router.POST("/transactions", addTransactions)
 	router.Run("localhost:9090")
@@ -25,6 +30,18 @@ func main() {
 
 func getTransactions(context *gin.Context) {
 	context.IndentedJSON(http.StatusOK, transactions)
+}
+
+func getTransactionById(c *gin.Context) {
+	id := c.Param("id")
+
+	for _, a := range transactions {
+		if a.TransactionId == id {
+			c.IndentedJSON(http.StatusOK, a)
+			return
+		}
+	}
+	c.IndentedJSON(http.StatusNotFound, gin.H{"message": "Transcation not found"})
 }
 
 func addTransactions(context *gin.Context) {

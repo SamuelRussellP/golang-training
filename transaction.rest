@@ -1,0 +1,14 @@
+### GET
+GET http://localhost:9090/transactions/
+
+### POST
+POST http://localhost:9090/transactions
+Content-Type: application/json
+
+{
+  "transaction_id": "3",
+  "login_status": true,
+  "transaction_status": true,
+  "transaction_amount": 70.0,
+  "balance": 200.0
+}
