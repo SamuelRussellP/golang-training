@@ -12,7 +12,7 @@ import (
 type transaction struct {
 	TransactionId     uuid.UUID `json:"transaction_id"`
 	BankId            string    `json:"bank_id"`
-	TransactionStatus bool      `json:"transaction_status"`
+	TransactionStatus string    `json:"transaction_status"`
 	TransactionAmount float32   `json:"transaction_amount"`
 	TransactionFee    float32   `json:"transaction_fee"`
 	TransactionTime   time.Time `json:"transaction_time"`
@@ -29,13 +29,12 @@ type account struct {
 	LoginStatus bool   `json:"login_status"`
 }
 
-var transactions []transaction
-
 var banks = []bank{
 	{BankId: "BCA", BankPercentage: 0.2},
 	{BankId: "BRI", BankPercentage: 0.1},
 }
 
+var transactions []transaction
 var AccountSession account
 
 func main() {
@@ -47,10 +46,13 @@ func main() {
 	router.GET("/banks/fee/:bank_id/:transactionAmount", getTransactionFeeByBank)
 	router.GET("/account", getAccount)
 	router.POST("/transactions", addTransactions)
+	router.POST("/transactions/confirmTransaction/:id", confirmTransaction)
 	router.POST("/banks", addBanks)
 	router.POST("/account", addAccount)
-	//router.PATCH("/account", toggleLogInStatus)
-	router.Run("localhost:9090")
+	err := router.Run("localhost:9090")
+	if err != nil {
+		return
+	}
 }
 
 func isLoggedIn(context *gin.Context) bool {
@@ -60,19 +62,8 @@ func isLoggedIn(context *gin.Context) bool {
 	return false
 }
 
-//func toggleLogInStatus(context *gin.Context) {
-//	err := context.BindJSON(&AccountSession)
-//	if err != nil {
-//		context.IndentedJSON(http.StatusNotFound, gin.H{"message": "account not found"})
-//		return
-//	}
-//	AccountSession.LoginStatus = !AccountSession.LoginStatus
-//}
-
 func addAccount(context *gin.Context) {
 	var newAccount account
-	//newAccount.AccountId = "1"
-	//newAccount.AccountName = "Samuel"
 	newAccount.LoginStatus = true
 
 	err := context.BindJSON(&newAccount)
@@ -140,6 +131,20 @@ func getBankPercentageByBankId(bankId string) (*bank, error) {
 	return nil, errors.New("bank not found")
 }
 
+func confirmTransaction(context *gin.Context) {
+	id := context.Param("id")
+	trId, err := uuid.Parse(id)
+	transaction, err := getTransactionById(trId)
+
+	if err != nil {
+		context.IndentedJSON(http.StatusNotFound, gin.H{"message": "transaction not found"})
+		return
+	}
+
+	transaction.TransactionStatus = "paid"
+	context.IndentedJSON(http.StatusOK, transaction)
+}
+
 func addTransactions(context *gin.Context) {
 	if !isLoggedIn(context) {
 		context.IndentedJSON(http.StatusOK, "Login Required")
@@ -151,6 +156,7 @@ func addTransactions(context *gin.Context) {
 
 	err := context.BindJSON(&newTransaction)
 	if err != nil {
+		context.IndentedJSON(http.StatusBadRequest, "Please fill in required fields")
 		return
 	}
 
