@@ -21,8 +21,7 @@ Content-Type: application/json
   "login_status": true,
   "bank_id": "BRI",
   "transaction_status": true,
-  "transaction_amount": 10000.0,
-  "balance": 200.0
+  "transaction_amount": 10000.0
 }
 
 ### POST
@@ -39,6 +38,6 @@ POST http://localhost:9090/account
 Content-Type: application/json
 
 {
-    "account_id": "SWE1809941",
+    "account_id": "SWE1809942",
     "account_name": "SamuelRussell"
 }

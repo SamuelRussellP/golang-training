@@ -11,7 +11,6 @@ import (
 
 type transaction struct {
 	TransactionId     uuid.UUID `json:"transaction_id"`
-	LoginStatus       bool      `json:"login_status"`
 	BankId            string    `json:"bank_id"`
 	TransactionStatus bool      `json:"transaction_status"`
 	TransactionAmount float32   `json:"transaction_amount"`
@@ -27,6 +26,7 @@ type bank struct {
 type account struct {
 	AccountId   string `json:"account_id"`
 	AccountName string `json:"account_name"`
+	LoginStatus bool   `json:"login_status"`
 }
 
 var transactions []transaction
@@ -49,17 +49,31 @@ func main() {
 	router.POST("/transactions", addTransactions)
 	router.POST("/banks", addBanks)
 	router.POST("/account", addAccount)
+	//router.PATCH("/account", toggleLogInStatus)
 	router.Run("localhost:9090")
 }
 
 func isLoggedIn(context *gin.Context) bool {
-	return len(AccountSession.AccountId) > 0
+	if len(AccountSession.AccountId) > 0 {
+		return true
+	}
+	return false
 }
+
+//func toggleLogInStatus(context *gin.Context) {
+//	err := context.BindJSON(&AccountSession)
+//	if err != nil {
+//		context.IndentedJSON(http.StatusNotFound, gin.H{"message": "account not found"})
+//		return
+//	}
+//	AccountSession.LoginStatus = !AccountSession.LoginStatus
+//}
 
 func addAccount(context *gin.Context) {
 	var newAccount account
 	//newAccount.AccountId = "1"
 	//newAccount.AccountName = "Samuel"
+	newAccount.LoginStatus = true
 
 	err := context.BindJSON(&newAccount)
 	if err != nil {
