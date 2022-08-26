@@ -1,8 +1,11 @@
 package main
 
 import (
+	"database/sql"
 	"errors"
+	"fmt"
 	"github.com/gin-gonic/gin"
+	_ "github.com/go-sql-driver/mysql"
 	"github.com/google/uuid"
 	"net/http"
 	"strconv"
@@ -38,6 +41,21 @@ var transactions []transaction
 var AccountSession account
 
 func main() {
+
+	db, err := sql.Open("mysql", "root:@Admin123@tcp(localhost:3306)/go-training-payment")
+	if err != nil {
+		fmt.Println("Error validating sql.Open arguments")
+		panic(err.Error())
+	}
+	defer db.Close()
+	fmt.Println("Connected to database")
+
+	err = db.Ping()
+	if err != nil {
+		fmt.Println("Error validating db.Ping")
+		panic(err.Error())
+	}
+
 	router := gin.Default()
 	router.GET("/transactions/:id", getTransaction)
 	router.GET("/transactions", getTransactions)
@@ -49,10 +67,7 @@ func main() {
 	router.POST("/transactions/confirmTransaction/:id", confirmTransaction)
 	router.POST("/banks", addBanks)
 	router.POST("/account", addAccount)
-	err := router.Run("localhost:9090")
-	if err != nil {
-		return
-	}
+	router.Run("localhost:9090")
 }
 
 func isLoggedIn(context *gin.Context) bool {
