@@ -65,6 +65,7 @@ func main() {
 	router.GET("/account", getAccount)
 	router.POST("/transactions", addTransactions)
 	router.POST("/transactions/confirmTransaction/:id", confirmTransaction)
+	router.POST("/transactions/cancelTransaction/:id", cancelTransaction)
 	router.POST("/banks", addBanks)
 	router.POST("/account", addAccount)
 	router.Run("localhost:9090")
@@ -156,8 +157,40 @@ func confirmTransaction(context *gin.Context) {
 		return
 	}
 
-	transaction.TransactionStatus = "paid"
-	context.IndentedJSON(http.StatusOK, transaction)
+	if transaction.TransactionStatus == "ready" {
+		transaction.TransactionStatus = "paid"
+		context.IndentedJSON(http.StatusOK, transaction)
+
+	} else if transaction.TransactionStatus == "cancelled" {
+		context.IndentedJSON(http.StatusOK, gin.H{"message": "transaction has been cancelled. Cannot confirm transaction"})
+		return
+	} else {
+		context.IndentedJSON(http.StatusOK, gin.H{"message": "this transaction has been confirmed"})
+		return
+	}
+}
+
+func cancelTransaction(context *gin.Context) {
+	id := context.Param("id")
+	trId, err := uuid.Parse(id)
+	transaction, err := getTransactionById(trId)
+
+	if err != nil {
+		context.IndentedJSON(http.StatusNotFound, gin.H{"message": "transaction not found"})
+		return
+	}
+
+	if transaction.TransactionStatus == "ready" {
+		transaction.TransactionStatus = "cancelled"
+		context.IndentedJSON(http.StatusOK, transaction)
+
+	} else if transaction.TransactionStatus == "paid" {
+		context.IndentedJSON(http.StatusOK, gin.H{"message": "transaction has been paid. Cannot cancel transaction"})
+		return
+	} else {
+		context.IndentedJSON(http.StatusOK, gin.H{"message": "this transaction has been cancelled"})
+		return
+	}
 }
 
 func addTransactions(context *gin.Context) {
