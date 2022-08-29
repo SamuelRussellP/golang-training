@@ -36,25 +36,10 @@ var banks = []bank{
 	{BankId: "BCA", BankPercentage: 0.2},
 	{BankId: "BRI", BankPercentage: 0.1},
 }
-
 var transactions []transaction
 var AccountSession account
 
 func main() {
-
-	db, err := sql.Open("mysql", "root:@Admin123@tcp(localhost:3306)/go-training-payment")
-	if err != nil {
-		fmt.Println("Error validating sql.Open arguments")
-		panic(err.Error())
-	}
-	defer db.Close()
-	fmt.Println("Connected to database")
-
-	err = db.Ping()
-	if err != nil {
-		fmt.Println("Error validating db.Ping")
-		panic(err.Error())
-	}
 
 	router := gin.Default()
 	router.GET("/transactions/:id", getTransaction)
@@ -69,6 +54,22 @@ func main() {
 	router.POST("/banks", addBanks)
 	router.POST("/account", addAccount)
 	router.Run("localhost:9090")
+}
+
+func connect() *sql.DB {
+	db, err := sql.Open("mysql", "root:@Admin123@tcp(localhost:3306)/go-training-payment?parseTime=true")
+	if err != nil {
+		fmt.Println("Error validating sql.Open arguments")
+		panic(err.Error())
+	}
+	fmt.Println("Connected to database")
+
+	err = db.Ping()
+	if err != nil {
+		fmt.Println("Error validating db.Ping")
+		panic(err.Error())
+	}
+	return db
 }
 
 func isLoggedIn(context *gin.Context) bool {
@@ -98,10 +99,63 @@ func getAccount(context *gin.Context) {
 	}
 }
 
+func fetchTransactions() {
+	var tempTransaction transaction
+
+	db := connect()
+	defer db.Close()
+	rows, err := db.Query("SELECT * FROM `go-training-payment`.transaction_details")
+	if err != nil {
+		fmt.Println("Error validating sql.Query arguments")
+		panic(err.Error())
+	}
+	for rows.Next() {
+		if err := rows.Scan(&tempTransaction.TransactionId, &tempTransaction.BankId, &tempTransaction.TransactionStatus, &tempTransaction.TransactionAmount, &tempTransaction.TransactionFee, &tempTransaction.TransactionTime); err != nil {
+			fmt.Println("Error validating sql.Query arguments")
+			panic(err.Error())
+		} else {
+			if !isTransactionExist(tempTransaction) {
+				transactions = append(transactions, tempTransaction)
+			}
+		}
+	}
+}
+
+func isTransactionExist(transaction transaction) bool {
+	for _, a := range transactions {
+		if a.TransactionId == transaction.TransactionId {
+			return true
+		}
+	}
+	return false
+}
+
+func insertTransaction(transaksi transaction) error {
+	db := connect()
+
+	queryText := fmt.Sprintf("INSERT INTO `go-training-payment`.transaction_details  (transaction_id, bank_id, transaction_status, transaction_amount, transaction_fee, transaction_time)"+"VALUES ('%v','%v','%v','%v','%v','%v')",
+		transaksi.TransactionId,
+		transaksi.BankId,
+		transaksi.TransactionStatus,
+		transaksi.TransactionAmount,
+		transaksi.TransactionFee,
+		transaksi.TransactionTime,
+	)
+
+	_, err := db.Query(queryText)
+
+	if err != nil {
+		fmt.Println("Error validating sql.Query arguments")
+		panic(err.Error())
+	}
+	return nil
+}
+
 func getTransactions(context *gin.Context) {
 	if len(transactions) == 0 {
 		context.IndentedJSON(http.StatusOK, gin.H{"message": "You have no transactions"})
 	} else {
+		fetchTransactions()
 		context.IndentedJSON(http.StatusOK, transactions)
 	}
 }
@@ -216,6 +270,7 @@ func addTransactions(context *gin.Context) {
 	}
 	newTransaction.TransactionFee = newTransaction.TransactionAmount * newTransactionPercentage.BankPercentage
 	transactions = append(transactions, newTransaction)
+	insertTransaction(newTransaction)
 	context.IndentedJSON(http.StatusOK, newTransaction)
 }
 
