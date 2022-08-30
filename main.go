@@ -99,8 +99,7 @@ func getAccount(context *gin.Context) {
 	}
 }
 
-func fetchTransactions() (transaction, error) {
-	var tempTransaction transaction
+func fetchTransactions(context *gin.Context) {
 	db := connect()
 	queryText := fmt.Sprintf("SELECT * FROM `go-training-payment`.transaction_details")
 
@@ -110,14 +109,26 @@ func fetchTransactions() (transaction, error) {
 		panic(err.Error())
 	}
 	for rows.Next() {
+		var tempTransaction transaction
 		if err := rows.Scan(&tempTransaction.TransactionId, &tempTransaction.BankId, &tempTransaction.TransactionStatus, &tempTransaction.TransactionAmount, &tempTransaction.TransactionFee, &tempTransaction.TransactionTime); err != nil {
 			fmt.Println("Error validating sql.Query arguments")
 			panic(err.Error())
 		} else {
-			return tempTransaction, nil
+			if !isTransactionExist(tempTransaction) {
+				transactions = append(transactions, tempTransaction)
+			}
 		}
 	}
-	return tempTransaction, errors.New("transaction not found")
+	context.IndentedJSON(http.StatusOK, transactions)
+}
+
+func isTransactionExist(transaction transaction) bool {
+	for _, a := range transactions {
+		if a.TransactionId == transaction.TransactionId {
+			return true
+		}
+	}
+	return false
 }
 
 func fetchTransactionById(id uuid.UUID) (transaction, error) {
@@ -190,15 +201,8 @@ func getTransactions(context *gin.Context) {
 	if len(transactions) == 0 {
 		context.IndentedJSON(http.StatusOK, gin.H{"message": "You have no transactions"})
 	} else {
-		transaction, err := fetchTransactions()
-
-		if err != nil {
-			context.IndentedJSON(http.StatusNotFound, gin.H{"message": "transaction not found"})
-			return
-		}
-		context.IndentedJSON(http.StatusOK, transaction)
+		fetchTransactions(context)
 	}
-
 }
 
 func getTransaction(context *gin.Context) {
@@ -303,8 +307,8 @@ func addTransactions(context *gin.Context) {
 		return
 	}
 	newTransaction.TransactionFee = newTransaction.TransactionAmount * newTransactionPercentage.BankPercentage
-	transactions = append(transactions, newTransaction)
 	insertTransaction(newTransaction)
+	transactions = append(transactions, newTransaction)
 	context.IndentedJSON(http.StatusOK, newTransaction)
 }
 
