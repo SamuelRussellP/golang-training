@@ -101,6 +101,9 @@ func getAccount(context *gin.Context) {
 
 func fetchTransactions(context *gin.Context) {
 	db := connect()
+
+	var tempTransaction transaction
+	var tempTransactionList []transaction
 	queryText := fmt.Sprintf("SELECT * FROM `go-training-payment`.transaction_details")
 
 	rows, err := db.Query(queryText)
@@ -109,26 +112,19 @@ func fetchTransactions(context *gin.Context) {
 		panic(err.Error())
 	}
 	for rows.Next() {
-		var tempTransaction transaction
 		if err := rows.Scan(&tempTransaction.TransactionId, &tempTransaction.BankId, &tempTransaction.TransactionStatus, &tempTransaction.TransactionAmount, &tempTransaction.TransactionFee, &tempTransaction.TransactionTime); err != nil {
 			fmt.Println("Error validating sql.Query arguments")
 			panic(err.Error())
 		} else {
-			if !isTransactionExist(tempTransaction) {
-				transactions = append(transactions, tempTransaction)
-			}
+			transactions = append(transactions, tempTransaction)
+			tempTransactionList = append(tempTransactionList, tempTransaction)
 		}
 	}
-	context.IndentedJSON(http.StatusOK, transactions)
-}
-
-func isTransactionExist(transaction transaction) bool {
-	for _, a := range transactions {
-		if a.TransactionId == transaction.TransactionId {
-			return true
-		}
+	if len(tempTransactionList) > 0 {
+		context.IndentedJSON(http.StatusOK, tempTransactionList)
+	} else {
+		context.IndentedJSON(http.StatusOK, "No transactions found")
 	}
-	return false
 }
 
 func fetchTransactionById(id uuid.UUID) (transaction, error) {
@@ -152,15 +148,6 @@ func fetchTransactionById(id uuid.UUID) (transaction, error) {
 	return tempTransaction, errors.New("transaction not found")
 }
 
-//func isTransactionExist(transaction transaction) bool {
-//	for _, a := range transactions {
-//		if a.TransactionId == transaction.TransactionId {
-//			return true
-//		}
-//	}
-//	return false
-//}
-
 func updateTransaction(transaksi transaction) error {
 	db := connect()
 
@@ -178,6 +165,7 @@ func updateTransaction(transaksi transaction) error {
 
 func insertTransaction(transaksi transaction) error {
 	db := connect()
+	defer db.Close()
 
 	queryText := fmt.Sprintf("INSERT INTO `go-training-payment`.transaction_details  (transaction_id, bank_id, transaction_status, transaction_amount, transaction_fee, transaction_time)"+"VALUES ('%v','%v','%v','%v','%v','%v')",
 		transaksi.TransactionId,
@@ -198,11 +186,7 @@ func insertTransaction(transaksi transaction) error {
 }
 
 func getTransactions(context *gin.Context) {
-	if len(transactions) == 0 {
-		context.IndentedJSON(http.StatusOK, gin.H{"message": "You have no transactions"})
-	} else {
-		fetchTransactions(context)
-	}
+	fetchTransactions(context)
 }
 
 func getTransaction(context *gin.Context) {
