@@ -1,43 +1,25 @@
 package main
 
 import (
+	model "GOTraining/model"
 	"database/sql"
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/google/uuid"
+	"net"
 	"net/http"
 	"strconv"
 	"time"
 )
 
-type transaction struct {
-	TransactionId     uuid.UUID `json:"transaction_id"`
-	BankId            string    `json:"bank_id"`
-	TransactionStatus string    `json:"transaction_status"`
-	TransactionAmount float32   `json:"transaction_amount"`
-	TransactionFee    float32   `json:"transaction_fee"`
-	TransactionTime   string    `json:"transaction_time"`
-}
-
-type bank struct {
-	BankId         string  `json:"bank_id"`
-	BankPercentage float32 `json:"bank_percentage"`
-}
-
-type account struct {
-	AccountId   string `json:"account_id"`
-	AccountName string `json:"account_name"`
-	LoginStatus bool   `json:"login_status"`
-}
-
-var banks = []bank{
+var banks = []model.Bank{
 	{BankId: "BCA", BankPercentage: 0.2},
 	{BankId: "BRI", BankPercentage: 0.1},
 }
-var transactions []transaction
-var AccountSession account
+var transactions []model.Transaction
+var AccountSession model.Account
 
 func main() {
 
@@ -80,7 +62,7 @@ func isLoggedIn(context *gin.Context) bool {
 }
 
 func addAccount(context *gin.Context) {
-	var newAccount account
+	var newAccount model.Account
 	newAccount.LoginStatus = true
 
 	err := context.BindJSON(&newAccount)
@@ -102,8 +84,8 @@ func getAccount(context *gin.Context) {
 func fetchTransactions(context *gin.Context) {
 	db := connect()
 
-	var tempTransaction transaction
-	var tempTransactionList []transaction
+	var tempTransaction model.Transaction
+	var tempTransactionList []model.Transaction
 	queryText := fmt.Sprintf("SELECT * FROM `go-training-payment`.transaction_details")
 
 	rows, err := db.Query(queryText)
@@ -127,8 +109,8 @@ func fetchTransactions(context *gin.Context) {
 	}
 }
 
-func fetchTransactionById(id uuid.UUID) (transaction, error) {
-	var tempTransaction transaction
+func fetchTransactionById(id uuid.UUID) (model.Transaction, error) {
+	var tempTransaction model.Transaction
 	db := connect()
 	queryText := fmt.Sprintf("SELECT * FROM `go-training-payment`.transaction_details WHERE transaction_id = '%v'", id)
 
@@ -148,7 +130,7 @@ func fetchTransactionById(id uuid.UUID) (transaction, error) {
 	return tempTransaction, errors.New("transaction not found")
 }
 
-func updateTransaction(transaksi transaction, context *gin.Context) {
+func updateTransaction(transaksi model.Transaction, context *gin.Context) {
 	db := connect()
 	defer db.Close()
 
@@ -167,7 +149,7 @@ func updateTransaction(transaksi transaction, context *gin.Context) {
 	context.IndentedJSON(http.StatusOK, transaksi)
 }
 
-func insertTransaction(transaksi transaction) error {
+func insertTransaction(transaksi model.Transaction) error {
 	db := connect()
 	defer db.Close()
 
@@ -212,7 +194,7 @@ func getBankPercentage(context *gin.Context) {
 	context.IndentedJSON(http.StatusOK, bank)
 }
 
-func getBankPercentageByBankId(bankId string) (*bank, error) {
+func getBankPercentageByBankId(bankId string) (*model.Bank, error) {
 	for i, a := range banks {
 		if a.BankId == bankId {
 			return &banks[i], nil
@@ -232,8 +214,16 @@ func confirmTransaction(context *gin.Context) {
 	}
 
 	if transaction.TransactionStatus == "ready" {
+
+		conn, err := net.Dial("tcp", "localhost:9091")
+		if err != nil {
+			context.IndentedJSON(http.StatusNotFound, gin.H{"message": "Bank server is down"})
+			return
+		}
+		defer conn.Close()
 		transaction.TransactionStatus = "paid"
 		updateTransaction(transaction, context)
+		context.IndentedJSON(http.StatusOK, gin.H{"message": "Transaction is confirmed by bank"})
 
 	} else if transaction.TransactionStatus == "cancelled" {
 		context.IndentedJSON(http.StatusOK, gin.H{"message": "transaction has been cancelled. Cannot confirm transaction"})
@@ -272,7 +262,7 @@ func addTransactions(context *gin.Context) {
 		context.IndentedJSON(http.StatusOK, "Login Required")
 		return
 	}
-	var newTransaction transaction
+	var newTransaction model.Transaction
 	newTransaction.TransactionId = uuid.New()
 	newTransaction.TransactionTime = time.Now().Format("2006-01-02 15:04:05")
 
@@ -295,7 +285,7 @@ func addTransactions(context *gin.Context) {
 }
 
 func addBanks(context *gin.Context) {
-	var newBank bank
+	var newBank model.Bank
 
 	err := context.BindJSON(&newBank)
 	if err != nil {
