@@ -99,12 +99,12 @@ func getAccount(context *gin.Context) {
 	}
 }
 
-func fetchTransactions() []transaction {
+func fetchTransactions() (transaction, error) {
 	var tempTransaction transaction
-
 	db := connect()
-	defer db.Close()
-	rows, err := db.Query("SELECT * FROM `go-training-payment`.transaction_details")
+	queryText := fmt.Sprintf("SELECT * FROM `go-training-payment`.transaction_details")
+
+	rows, err := db.Query(queryText)
 	if err != nil {
 		fmt.Println("Error validating sql.Query arguments")
 		panic(err.Error())
@@ -113,9 +113,11 @@ func fetchTransactions() []transaction {
 		if err := rows.Scan(&tempTransaction.TransactionId, &tempTransaction.BankId, &tempTransaction.TransactionStatus, &tempTransaction.TransactionAmount, &tempTransaction.TransactionFee, &tempTransaction.TransactionTime); err != nil {
 			fmt.Println("Error validating sql.Query arguments")
 			panic(err.Error())
+		} else {
+			return tempTransaction, nil
 		}
 	}
-	return transactions
+	return tempTransaction, errors.New("transaction not found")
 }
 
 func fetchTransactionById(id uuid.UUID) (transaction, error) {
@@ -139,14 +141,14 @@ func fetchTransactionById(id uuid.UUID) (transaction, error) {
 	return tempTransaction, errors.New("transaction not found")
 }
 
-func isTransactionExist(transaction transaction) bool {
-	for _, a := range transactions {
-		if a.TransactionId == transaction.TransactionId {
-			return true
-		}
-	}
-	return false
-}
+//func isTransactionExist(transaction transaction) bool {
+//	for _, a := range transactions {
+//		if a.TransactionId == transaction.TransactionId {
+//			return true
+//		}
+//	}
+//	return false
+//}
 
 func updateTransaction(transaksi transaction) error {
 	db := connect()
@@ -188,8 +190,13 @@ func getTransactions(context *gin.Context) {
 	if len(transactions) == 0 {
 		context.IndentedJSON(http.StatusOK, gin.H{"message": "You have no transactions"})
 	} else {
-		transactions := fetchTransactions()
-		context.IndentedJSON(http.StatusOK, transactions)
+		transaction, err := fetchTransactions()
+
+		if err != nil {
+			context.IndentedJSON(http.StatusNotFound, gin.H{"message": "transaction not found"})
+			return
+		}
+		context.IndentedJSON(http.StatusOK, transaction)
 	}
 
 }
