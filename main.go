@@ -43,7 +43,7 @@ func main() {
 
 	router := gin.Default()
 	router.GET("/transactions/:id", getTransaction)
-	router.GET("/transactions", getTransactions)
+	router.GET("/transactions", fetchTransactions)
 	router.GET("/banks/", getBanks)
 	router.GET("/banks/:bank_id", getBankPercentage)
 	router.GET("/banks/fee/:bank_id/:transactionAmount", getTransactionFeeByBank)
@@ -148,11 +148,15 @@ func fetchTransactionById(id uuid.UUID) (transaction, error) {
 	return tempTransaction, errors.New("transaction not found")
 }
 
-func updateTransaction(transaksi transaction) error {
+func updateTransaction(transaksi transaction, context *gin.Context) {
 	db := connect()
+	defer db.Close()
 
-	queryText := fmt.Sprintf("UPDATE `go-training-payment`.transaction_details SET transaction_status = '%v' WHERE transaction_id = '%v'",
+	transaksi.TransactionTime = time.Now().Format("2006-01-02 15:04:05")
+
+	queryText := fmt.Sprintf("UPDATE `go-training-payment`.transaction_details SET transaction_status = '%v', transaction_time = '%v' WHERE transaction_id = '%v'",
 		transaksi.TransactionStatus,
+		transaksi.TransactionTime,
 		transaksi.TransactionId,
 	)
 	_, err := db.Query(queryText)
@@ -160,7 +164,7 @@ func updateTransaction(transaksi transaction) error {
 		fmt.Println("Error validating sql.Query arguments")
 		panic(err.Error())
 	}
-	return nil
+	context.IndentedJSON(http.StatusOK, transaksi)
 }
 
 func insertTransaction(transaksi transaction) error {
@@ -183,10 +187,6 @@ func insertTransaction(transaksi transaction) error {
 		panic(err.Error())
 	}
 	return nil
-}
-
-func getTransactions(context *gin.Context) {
-	fetchTransactions(context)
 }
 
 func getTransaction(context *gin.Context) {
@@ -233,8 +233,7 @@ func confirmTransaction(context *gin.Context) {
 
 	if transaction.TransactionStatus == "ready" {
 		transaction.TransactionStatus = "paid"
-		updateTransaction(transaction)
-		context.IndentedJSON(http.StatusOK, transaction)
+		updateTransaction(transaction, context)
 
 	} else if transaction.TransactionStatus == "cancelled" {
 		context.IndentedJSON(http.StatusOK, gin.H{"message": "transaction has been cancelled. Cannot confirm transaction"})
@@ -257,8 +256,7 @@ func cancelTransaction(context *gin.Context) {
 
 	if transaction.TransactionStatus == "ready" {
 		transaction.TransactionStatus = "cancelled"
-		updateTransaction(transaction)
-		context.IndentedJSON(http.StatusOK, transaction)
+		updateTransaction(transaction, context)
 
 	} else if transaction.TransactionStatus == "paid" {
 		context.IndentedJSON(http.StatusOK, gin.H{"message": "transaction has been paid. Cannot cancel transaction"})
