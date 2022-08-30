@@ -18,7 +18,7 @@ type transaction struct {
 	TransactionStatus string    `json:"transaction_status"`
 	TransactionAmount float32   `json:"transaction_amount"`
 	TransactionFee    float32   `json:"transaction_fee"`
-	TransactionTime   time.Time `json:"transaction_time"`
+	TransactionTime   string    `json:"transaction_time"`
 }
 
 type bank struct {
@@ -62,7 +62,7 @@ func connect() *sql.DB {
 		fmt.Println("Error validating sql.Open arguments")
 		panic(err.Error())
 	}
-	fmt.Println("Connected to database")
+	fmt.Println("Successful connection to database")
 
 	err = db.Ping()
 	if err != nil {
@@ -99,7 +99,7 @@ func getAccount(context *gin.Context) {
 	}
 }
 
-func fetchTransactions() {
+func fetchTransactions() []transaction {
 	var tempTransaction transaction
 
 	db := connect()
@@ -113,12 +113,30 @@ func fetchTransactions() {
 		if err := rows.Scan(&tempTransaction.TransactionId, &tempTransaction.BankId, &tempTransaction.TransactionStatus, &tempTransaction.TransactionAmount, &tempTransaction.TransactionFee, &tempTransaction.TransactionTime); err != nil {
 			fmt.Println("Error validating sql.Query arguments")
 			panic(err.Error())
-		} else {
-			if !isTransactionExist(tempTransaction) {
-				transactions = append(transactions, tempTransaction)
-			}
 		}
 	}
+	return transactions
+}
+
+func fetchTransactionById(id uuid.UUID) (transaction, error) {
+	var tempTransaction transaction
+	db := connect()
+	queryText := fmt.Sprintf("SELECT * FROM `go-training-payment`.transaction_details WHERE transaction_id = '%v'", id)
+
+	rows, err := db.Query(queryText)
+	if err != nil {
+		fmt.Println("Error validating sql.Query arguments")
+		panic(err.Error())
+	}
+	for rows.Next() {
+		if err := rows.Scan(&tempTransaction.TransactionId, &tempTransaction.BankId, &tempTransaction.TransactionStatus, &tempTransaction.TransactionAmount, &tempTransaction.TransactionFee, &tempTransaction.TransactionTime); err != nil {
+			fmt.Println("Error validating sql.Query arguments")
+			panic(err.Error())
+		} else {
+			return tempTransaction, nil
+		}
+	}
+	return tempTransaction, errors.New("transaction not found")
 }
 
 func isTransactionExist(transaction transaction) bool {
@@ -128,6 +146,21 @@ func isTransactionExist(transaction transaction) bool {
 		}
 	}
 	return false
+}
+
+func updateTransaction(transaksi transaction) error {
+	db := connect()
+
+	queryText := fmt.Sprintf("UPDATE `go-training-payment`.transaction_details SET transaction_status = '%v' WHERE transaction_id = '%v'",
+		transaksi.TransactionStatus,
+		transaksi.TransactionId,
+	)
+	_, err := db.Query(queryText)
+	if err != nil {
+		fmt.Println("Error validating sql.Query arguments")
+		panic(err.Error())
+	}
+	return nil
 }
 
 func insertTransaction(transaksi transaction) error {
@@ -155,30 +188,22 @@ func getTransactions(context *gin.Context) {
 	if len(transactions) == 0 {
 		context.IndentedJSON(http.StatusOK, gin.H{"message": "You have no transactions"})
 	} else {
-		fetchTransactions()
+		transactions := fetchTransactions()
 		context.IndentedJSON(http.StatusOK, transactions)
 	}
+
 }
 
 func getTransaction(context *gin.Context) {
 	id := context.Param("id")
 	trId, err := uuid.Parse(id)
-	transaction, err := getTransactionById(trId)
+	transaction, err := fetchTransactionById(trId)
 
 	if err != nil {
 		context.IndentedJSON(http.StatusNotFound, gin.H{"message": "transaction not found"})
 		return
 	}
 	context.IndentedJSON(http.StatusOK, transaction)
-}
-
-func getTransactionById(trId uuid.UUID) (*transaction, error) {
-	for i, a := range transactions {
-		if a.TransactionId == trId {
-			return &transactions[i], nil
-		}
-	}
-	return nil, errors.New("transaction not found")
 }
 
 func getBankPercentage(context *gin.Context) {
@@ -204,7 +229,7 @@ func getBankPercentageByBankId(bankId string) (*bank, error) {
 func confirmTransaction(context *gin.Context) {
 	id := context.Param("id")
 	trId, err := uuid.Parse(id)
-	transaction, err := getTransactionById(trId)
+	transaction, err := fetchTransactionById(trId)
 
 	if err != nil {
 		context.IndentedJSON(http.StatusNotFound, gin.H{"message": "transaction not found"})
@@ -213,13 +238,14 @@ func confirmTransaction(context *gin.Context) {
 
 	if transaction.TransactionStatus == "ready" {
 		transaction.TransactionStatus = "paid"
+		updateTransaction(transaction)
 		context.IndentedJSON(http.StatusOK, transaction)
 
 	} else if transaction.TransactionStatus == "cancelled" {
 		context.IndentedJSON(http.StatusOK, gin.H{"message": "transaction has been cancelled. Cannot confirm transaction"})
 		return
 	} else {
-		context.IndentedJSON(http.StatusOK, gin.H{"message": "this transaction has been confirmed"})
+		context.IndentedJSON(http.StatusOK, gin.H{"message": "this transaction has been confirmed."})
 		return
 	}
 }
@@ -227,7 +253,7 @@ func confirmTransaction(context *gin.Context) {
 func cancelTransaction(context *gin.Context) {
 	id := context.Param("id")
 	trId, err := uuid.Parse(id)
-	transaction, err := getTransactionById(trId)
+	transaction, err := fetchTransactionById(trId)
 
 	if err != nil {
 		context.IndentedJSON(http.StatusNotFound, gin.H{"message": "transaction not found"})
@@ -236,6 +262,7 @@ func cancelTransaction(context *gin.Context) {
 
 	if transaction.TransactionStatus == "ready" {
 		transaction.TransactionStatus = "cancelled"
+		updateTransaction(transaction)
 		context.IndentedJSON(http.StatusOK, transaction)
 
 	} else if transaction.TransactionStatus == "paid" {
@@ -254,7 +281,7 @@ func addTransactions(context *gin.Context) {
 	}
 	var newTransaction transaction
 	newTransaction.TransactionId = uuid.New()
-	newTransaction.TransactionTime = time.Now()
+	newTransaction.TransactionTime = time.Now().Format("2006-01-02 15:04:05")
 
 	err := context.BindJSON(&newTransaction)
 	if err != nil {
