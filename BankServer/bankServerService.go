@@ -16,17 +16,19 @@ var responseFromBank BankTransactionStatus
 
 func main() {
 	router := gin.Default()
-	router.POST("/bankservicestatus/:response_val", addBankTransaction)
-	router.GET("/bankservicestatus", getLastTransactionStatus)
+	router.POST("/bankServiceStatus/:response_val", addBankTransaction)
+	router.GET("/bankServiceStatus", getLastTransactionStatus)
 	router.Run("localhost:9091")
 }
 
 func generateBankMessage(response int) {
 	switch response {
 	case 200:
-		responseFromBank.Message = "Transaction Success!"
+		responseFromBank.Message = "Transaction is Confirmed!"
 	case 503:
-		responseFromBank.Message = "Service Unavailable"
+		responseFromBank.Message = "Server is currently down. Please try again later."
+	case 404:
+		responseFromBank.Message = "Server not found."
 	default:
 		responseFromBank.Message = "Response is unknown"
 	}

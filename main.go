@@ -8,8 +8,10 @@ import (
 	"github.com/gin-gonic/gin"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/google/uuid"
+	"github.com/sirupsen/logrus"
 	"net"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 )
@@ -22,7 +24,6 @@ var transactions []model.Transaction
 var AccountSession model.Account
 
 func main() {
-
 	router := gin.Default()
 	router.GET("/transactions/:id", getTransaction)
 	router.GET("/transactions", fetchTransactions)
@@ -161,7 +162,6 @@ func insertTransaction(transaksi model.Transaction) error {
 		transaksi.TransactionFee,
 		transaksi.TransactionTime,
 	)
-
 	_, err := db.Query(queryText)
 
 	if err != nil {
@@ -220,10 +220,28 @@ func confirmTransaction(context *gin.Context) {
 			context.IndentedJSON(http.StatusNotFound, gin.H{"message": "Bank server is down"})
 			return
 		}
+
 		defer conn.Close()
+
 		transaction.TransactionStatus = "paid"
 		updateTransaction(transaction, context)
 		context.IndentedJSON(http.StatusOK, gin.H{"message": "Transaction is confirmed by bank"})
+
+		logger := logrus.New()
+		file, _ := os.OpenFile("confirmTransaction.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+
+		logger.SetOutput(file)
+		logger.SetFormatter(&logrus.JSONFormatter{})
+
+		transactionFields := logrus.Fields{
+			"transaction_id":     transaction.TransactionId,
+			"bank_id":            transaction.BankId,
+			"transaction_status": transaction.TransactionStatus,
+			"transaction_amount": transaction.TransactionAmount,
+			"transaction_fee":    transaction.TransactionFee,
+			"transaction_time":   transaction.TransactionTime,
+		}
+		logger.WithFields(transactionFields).Info("Transaction Confirmed")
 
 	} else if transaction.TransactionStatus == "cancelled" {
 		context.IndentedJSON(http.StatusOK, gin.H{"message": "transaction has been cancelled. Cannot confirm transaction"})
@@ -248,6 +266,22 @@ func cancelTransaction(context *gin.Context) {
 		transaction.TransactionStatus = "cancelled"
 		updateTransaction(transaction, context)
 
+		logger := logrus.New()
+		file, _ := os.OpenFile("cancelTransaction.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+
+		logger.SetOutput(file)
+		logger.SetFormatter(&logrus.JSONFormatter{})
+
+		transactionFields := logrus.Fields{
+			"transaction_id":     transaction.TransactionId,
+			"bank_id":            transaction.BankId,
+			"transaction_status": transaction.TransactionStatus,
+			"transaction_amount": transaction.TransactionAmount,
+			"transaction_fee":    transaction.TransactionFee,
+			"transaction_time":   transaction.TransactionTime,
+		}
+		logger.WithFields(transactionFields).Info("Transaction Cancelled")
+
 	} else if transaction.TransactionStatus == "paid" {
 		context.IndentedJSON(http.StatusOK, gin.H{"message": "transaction has been paid. Cannot cancel transaction"})
 		return
@@ -264,6 +298,7 @@ func addTransactions(context *gin.Context) {
 	}
 	var newTransaction model.Transaction
 	newTransaction.TransactionId = uuid.New()
+	newTransaction.TransactionStatus = "ready"
 	newTransaction.TransactionTime = time.Now().Format("2006-01-02 15:04:05")
 
 	err := context.BindJSON(&newTransaction)
@@ -282,6 +317,23 @@ func addTransactions(context *gin.Context) {
 	insertTransaction(newTransaction)
 	transactions = append(transactions, newTransaction)
 	context.IndentedJSON(http.StatusOK, newTransaction)
+
+	logger := logrus.New()
+	file, _ := os.OpenFile("addTransaction.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+
+	logger.SetOutput(file)
+	logger.SetFormatter(&logrus.JSONFormatter{})
+
+	transactionFields := logrus.Fields{
+		"transaction_id":         newTransaction.TransactionId,
+		"bank_id":                newTransaction.BankId,
+		"transaction_status":     newTransaction.TransactionStatus,
+		"transaction_amount":     newTransaction.TransactionAmount,
+		"transaction_percentage": newTransactionPercentage.BankPercentage,
+		"transaction_fee":        newTransaction.TransactionFee,
+		"transaction_time":       newTransaction.TransactionTime,
+	}
+	logger.WithFields(transactionFields).Info("Transaction Created")
 }
 
 func addBanks(context *gin.Context) {
