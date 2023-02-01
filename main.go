@@ -36,6 +36,7 @@ func main() {
 	router.POST("/transactions/cancelTransaction/:id", cancelTransaction)
 	router.POST("/banks", addBanks)
 	router.POST("/account", addAccount)
+	router.POST("/banks/delete/:bank_id", deleteBank)
 	router.Run("localhost:9090")
 }
 
@@ -375,4 +376,17 @@ func getTransactionFeeByBank(context *gin.Context) {
 	} else {
 		context.IndentedJSON(http.StatusOK, "bank not found")
 	}
+}
+
+// function to delete bank by bankid
+func deleteBank(context *gin.Context) {
+	bankID := context.Param("bank_id")
+	for index, a := range banks {
+		if a.BankId == bankID {
+			banks = append(banks[:index], banks[index+1:]...)
+			context.IndentedJSON(http.StatusOK, gin.H{"message": "bank deleted"})
+			return
+		}
+	}
+	context.IndentedJSON(http.StatusNotFound, gin.H{"message": "bank not found"})
 }
